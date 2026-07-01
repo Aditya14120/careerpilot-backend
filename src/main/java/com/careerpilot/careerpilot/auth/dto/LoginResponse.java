@@ -7,15 +7,9 @@ import lombok.Data;
 @Data
 @Builder
 @AllArgsConstructor
-public class RegisterResponse {
+public class LoginResponse {
 
-    private Long id;
-
-    private String firstName;
-
-    private String lastName;
-
-    private String email;
+    private String token;
 
     private String message;
 }
