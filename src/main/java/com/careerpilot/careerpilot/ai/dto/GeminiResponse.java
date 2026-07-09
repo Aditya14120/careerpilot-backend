@@ -9,34 +9,29 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GeminiResponse {
 
-    private List<Candidate> candidates;
+    private List<Choice> choices;
 
     public String extractText() {
-        if (candidates == null || candidates.isEmpty()) {
-            throw new RuntimeException("Gemini returned no candidates");
+        if (choices == null || choices.isEmpty()) {
+            throw new RuntimeException("Groq returned no choices. Check your API key and model.");
         }
-        List<Part> parts = candidates.get(0).content.parts;
-        if (parts == null || parts.isEmpty()) {
-            throw new RuntimeException("Gemini returned empty content");
+        Choice choice = choices.get(0);
+        if (choice.message == null || choice.message.content == null || choice.message.content.isBlank()) {
+            throw new RuntimeException("Groq returned an empty response.");
         }
-        return parts.get(0).text;
+        return choice.message.content;
     }
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Candidate {
-        private Content content;
+    public static class Choice {
+        private Message message;
     }
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Content {
-        private List<Part> parts;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Part {
-        private String text;
+    public static class Message {
+        private String role;
+        private String content;
     }
 }

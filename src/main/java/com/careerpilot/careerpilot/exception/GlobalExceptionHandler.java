@@ -1,5 +1,6 @@
 package com.careerpilot.careerpilot.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+@Slf4j
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -62,8 +65,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
     }
 
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntime(RuntimeException ex) {
+        log.error("Runtime error: {}", ex.getMessage(), ex);
+        String message = ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred";
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", message);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+        log.error("Unexpected error", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "An unexpected error occurred");
     }
 

@@ -1,5 +1,6 @@
 package com.careerpilot.careerpilot.ai.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -9,39 +10,31 @@ import java.util.List;
 @Builder
 public class GeminiRequest {
 
-    private List<Content> contents;
-    private GenerationConfig generationConfig;
+    private String model;
+    private List<Message> messages;
+
+    @JsonProperty("max_tokens")
+    private int maxTokens;
+
+    private double temperature;
 
     @Data
     @Builder
-    public static class Content {
-        private List<Part> parts;
-    }
-
-    @Data
-    @Builder
-    public static class Part {
-        private String text;
-    }
-
-    @Data
-    @Builder
-    public static class GenerationConfig {
-        private int maxOutputTokens;
-        private double temperature;
+    public static class Message {
+        private String role;
+        private String content;
     }
 
     public static GeminiRequest of(String prompt, int maxTokens) {
         return GeminiRequest.builder()
-                .contents(List.of(
-                        Content.builder()
-                                .parts(List.of(Part.builder().text(prompt).build()))
+                .messages(List.of(
+                        Message.builder()
+                                .role("user")
+                                .content(prompt)
                                 .build()
                 ))
-                .generationConfig(GenerationConfig.builder()
-                        .maxOutputTokens(maxTokens)
-                        .temperature(0.1)
-                        .build())
+                .maxTokens(maxTokens)
+                .temperature(0.1)
                 .build();
     }
 }
