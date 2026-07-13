@@ -4,12 +4,14 @@ import com.careerpilot.careerpilot.ai.GeminiClient;
 import com.careerpilot.careerpilot.exception.ResumeNotFoundException;
 import com.careerpilot.careerpilot.resume.entity.Resume;
 import com.careerpilot.careerpilot.resume.repository.ResumeRepository;
+import com.careerpilot.careerpilot.skill.dto.ResumeAnalysisResponse;
 import com.careerpilot.careerpilot.skill.dto.SkillDto;
 import com.careerpilot.careerpilot.skill.dto.SkillExtractionResponse;
 import com.careerpilot.careerpilot.skill.entity.ExtractedSkill;
 import com.careerpilot.careerpilot.skill.repository.ExtractedSkillRepository;
 import com.careerpilot.careerpilot.skill.service.SkillExtractionService;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -91,6 +93,86 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
         }
 
         return resume;
+    }
+
+    @Override
+    public ResumeAnalysisResponse analyzeResume(Long resumeId, String userEmail) {
+        Resume resume = getResumeAndVerifyOwner(resumeId, userEmail);
+
+        if (resume.getExtractedText() == null || resume.getExtractedText().isBlank()) {
+            throw new IllegalArgumentException("Resume text has not been extracted yet. Please re-upload the resume.");
+        }
+
+        String prompt = buildAnalysisPrompt(resume.getExtractedText());
+        String rawResponse = geminiClient.generate(prompt);
+        return parseAnalysis(rawResponse, resumeId);
+    }
+
+    private String buildAnalysisPrompt(String resumeText) {
+        return """
+                You are a senior HR professional and ATS (Applicant Tracking System) expert with 15+ years \
+                of experience evaluating resumes across all industries.
+
+                TASK: Perform a comprehensive resume analysis and return a JSON object with the following fields:
+
+                - overallScore: integer 0-100 (holistic quality of the resume)
+                - atsScore: integer 0-100 (how well it will pass ATS systems — consider formatting, keywords, structure)
+                - summary: string (2-3 sentences summarizing the resume's overall impression)
+                - strengths: array of strings (3-5 specific things done well)
+                - weaknesses: array of strings (3-5 specific problems or gaps)
+                - suggestions: array of strings (4-6 actionable improvements, be specific)
+                - missingSections: array of strings (sections that are absent but would strengthen the resume, \
+                e.g. "LinkedIn URL", "GitHub Profile", "Certifications", "Quantified Achievements")
+                - keywordSuggestions: array of strings (5-8 high-value keywords/skills missing from this resume \
+                that are commonly required in jobs matching this candidate's profile)
+
+                SCORING GUIDE:
+                - 90-100: Exceptional, nearly perfect
+                - 75-89: Strong, minor improvements needed
+                - 60-74: Average, clear improvements needed
+                - 40-59: Below average, significant work required
+                - 0-39: Poor, major overhaul needed
+
+                OUTPUT FORMAT — return ONLY a valid JSON object, nothing else. \
+                No explanation, no markdown, no code fences:
+                {
+                  "overallScore": 72,
+                  "atsScore": 65,
+                  "summary": "The resume demonstrates...",
+                  "strengths": ["..."],
+                  "weaknesses": ["..."],
+                  "suggestions": ["..."],
+                  "missingSections": ["..."],
+                  "keywordSuggestions": ["..."]
+                }
+
+                RESUME:
+                """ + resumeText;
+    }
+
+    private ResumeAnalysisResponse parseAnalysis(String raw, Long resumeId) {
+        String cleaned = raw.trim()
+                .replaceAll("(?s)```json\\s*", "")
+                .replaceAll("(?s)```\\s*", "")
+                .trim();
+
+        try {
+            JsonNode node = objectMapper.readTree(cleaned);
+            return ResumeAnalysisResponse.builder()
+                    .resumeId(resumeId)
+                    .overallScore(node.path("overallScore").asInt(0))
+                    .atsScore(node.path("atsScore").asInt(0))
+                    .summary(node.path("summary").asText(""))
+                    .strengths(objectMapper.convertValue(node.path("strengths"), new TypeReference<List<String>>() {}))
+                    .weaknesses(objectMapper.convertValue(node.path("weaknesses"), new TypeReference<List<String>>() {}))
+                    .suggestions(objectMapper.convertValue(node.path("suggestions"), new TypeReference<List<String>>() {}))
+                    .missingSections(objectMapper.convertValue(node.path("missingSections"), new TypeReference<List<String>>() {}))
+                    .keywordSuggestions(objectMapper.convertValue(node.path("keywordSuggestions"), new TypeReference<List<String>>() {}))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to parse analysis response: {}", cleaned, e);
+            throw new RuntimeException("AI returned an unreadable response. Please try again.");
+        }
     }
 
     private String buildPrompt(String resumeText) {

@@ -1,5 +1,6 @@
 package com.careerpilot.careerpilot.skill.controller;
 
+import com.careerpilot.careerpilot.skill.dto.ResumeAnalysisResponse;
 import com.careerpilot.careerpilot.skill.dto.SkillExtractionResponse;
 import com.careerpilot.careerpilot.skill.service.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
@@ -27,5 +28,12 @@ public class SkillController {
             @PathVariable Long resumeId,
             @AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(skillExtractionService.getSkillsByResume(resumeId, userDetails.getUsername()));
+    }
+
+    @PostMapping("/analyze/{resumeId}")
+    public ResponseEntity<ResumeAnalysisResponse> analyze(
+            @PathVariable Long resumeId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(skillExtractionService.analyzeResume(resumeId, userDetails.getUsername()));
     }
 }
